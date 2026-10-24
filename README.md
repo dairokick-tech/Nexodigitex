@@ -1,32 +1,55 @@
-# NOVA DIGITEX — 11 rubros y POS especializados
+# NOVA DIGITEX — ERP + POS multirrubro
 
-Aplicación web adaptable a Windows y Android, con colores independientes por rubro.
+Aplicación web adaptable a escritorio Windows y móviles Android, con un punto de venta independiente por rubro y colores diferenciados.
 
-## Rubros
-1. Farmacias y boticas — azul
-2. Restaurantes y cafeterías — naranja
-3. Bodegas y minimarkets — verde
-4. Tiendas y comercios — morado
-5. Tiendas de ropa y calzado — fucsia
-6. Ferreterías — turquesa
-7. Mayoristas y distribuidores — azul oscuro
-8. Hoteles y hospedajes — dorado
-9. Servicios y oficinas — aqua
-10. Almacenes y logística — azul
-11. Librerías y útiles — violeta
+## 11 rubros y operaciones especializadas
+
+| Rubro | Color | Herramientas específicas |
+|---|---|---|
+| Farmacias y boticas | Azul | Lotes, vencimientos, receta/control especial y compras a laboratorio |
+| Restaurantes y cafeterías | Naranja | Mesas, comandas, reservas y delivery |
+| Bodegas y minimarkets | Verde | Código de barras, ventas por peso/unidad y fiado/cobranza |
+| Tiendas y comercios | Morado | Cotizaciones, pedidos, apartados, garantías y descuentos |
+| Tiendas de ropa y calzado | Fucsia | Tallas, colores, variantes, cambios y promociones |
+| Ferreterías | Turquesa | Conversión de unidades, cotizaciones de obra y compras |
+| Mayoristas y distribuidores | Azul oscuro | Precios por volumen, crédito, despacho y rutas |
+| Hoteles y hospedajes | Dorado | Reservas, check-in/check-out y cargos de huésped |
+| Servicios y oficinas | Aqua | Órdenes de servicio, contratos y cobros recurrentes |
+| Almacenes y logística | Azul | Recepción/despacho, picking/packing y transferencias |
+| Librerías y útiles | Violeta | ISBN, kits escolares y cotizaciones para colegios |
+
+## Funciones comunes del POS
+
+- Catálogo demostrativo, carrito, cantidades y medios de pago.
+- Guardado de ventas en el dispositivo, historial y exportación CSV.
+- Apertura/cierre de caja demostrativos.
+- Formularios operativos específicos por rubro.
+- Registros adicionales guardados localmente con cola para sincronización.
+- PWA básica para instalar en navegador compatible y caché de archivos principales.
 
 ## Activar Supabase
+
 1. Crea un proyecto en Supabase.
-2. Abre SQL Editor y ejecuta `supabase/schema.sql`.
-3. En la app, abre **Supabase y configuración** e introduce Project URL y la clave pública (publishable/anon).
-4. Crea una cuenta con email y contraseña e inicia sesión.
-5. Las ventas guardadas mientras estabas offline se mantienen en una cola local y se intentan sincronizar al iniciar sesión/volver a estar en línea.
+2. Abre **SQL Editor** y ejecuta el archivo `supabase/schema.sql`.
+3. En la aplicación entra a **Supabase y configuración**.
+4. Ingresa Project URL y clave pública/publishable (o anon public key).
+5. Crea una cuenta e inicia sesión.
+6. Verifica que la cola de ventas y operaciones se sincronice; prueba con dos dispositivos antes de usar datos reales.
 
-## Seguridad
-- No usar service_role en el frontend.
-- El esquema aplica RLS y limita cada usuario a sus propias ventas y clientes.
-- La URL y clave pública se guardan en localStorage del navegador.
-- No guardar información real sensible en la versión prototipo.
+El esquema contiene tablas `sales`, `customers` y `business_records` con RLS que restringe registros al usuario autenticado.
 
-## Estado y límites
-El POS incluye carrito, cantidades, medios de pago, historial local y exportación CSV. Los catálogos, precios y stock son de ejemplo. La sincronización actual está implementada para ventas y clientes; debe validarse con dos o más dispositivos antes de operar en producción. No incluye todavía SUNAT, comprobantes electrónicos, impresoras, inventario transaccional completo, caja con arqueo, gestión multiempresa/roles ni auditoría integral.
+## GitHub Pages
+
+La publicación automática está definida en `.github/workflows/deploy.yml`. Si el workflow falla en **Setup Pages**, abre Settings → Pages del repositorio y selecciona **GitHub Actions** como Build and deployment source. Después vuelve a ejecutar el workflow desde Actions.
+
+## Seguridad y estado real
+
+- Nunca insertar la clave `service_role` en el frontend ni en archivos de GitHub.
+- El esquema usa RLS, pero cada empresa/tenant, sucursal y rol todavía requiere modelado antes de operación multiempresa.
+- No introducir datos reales sensibles en esta versión prototipo.
+- Los productos, precios y stocks que aparecen en pantalla son demostrativos.
+- Las operaciones especiales se guardan en el navegador y se envían a `business_records` cuando hay sesión y conexión; debe validarse la sincronización multi-dispositivo y la recuperación de fallos.
+- No está listo para facturación electrónica SUNAT. Faltan integración homologada, certificados, series, envío/consulta de comprobantes y pruebas.
+- También faltan inventario transaccional con kardex, permisos por rol, auditoría completa, impresoras, compras completas, cuentas por cobrar/pagar y pruebas de seguridad.
+
+**No usar todavía como sistema contable/fiscal o caja comercial de producción.**
