@@ -1,0 +1,9 @@
+{
+  "name": "NOVA DIGITEX ERP + POS",
+  "short_name": "NOVA DIGITEX",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f2f6fa",
+  "theme_color": "#123b60",
+  "description": "Prototipo multirrubro de punto de venta"
+}
