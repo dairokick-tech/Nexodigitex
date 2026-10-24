@@ -1,9 +1,14 @@
 {
+  "id": "./",
   "name": "NOVA DIGITEX ERP + POS",
   "short_name": "NOVA DIGITEX",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#f2f6fa",
-  "theme_color": "#123b60",
-  "description": "Prototipo multirrubro de punto de venta"
+  "theme_color": "#082f50",
+  "description": "Sistema POS multirrubro con 11 puntos de venta especializados.",
+  "icons": [
+    {"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
 }
