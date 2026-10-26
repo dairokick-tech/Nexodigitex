@@ -276,7 +276,7 @@ app.post('/api/sales', auth, tenantContext, requireRole('admin','manager','cashi
   if (!client) return;
   try {
     const { operationKey, customerId = null, items, paymentMethod = 'cash', discount = 0 } = req.body || {};
-    if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(String(operationKey || ''))) return res.status(400).json({ error: 'operationKey UUID es obligatorio para evitar ventas duplicadas.' });
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(operationKey || ''))) return res.status(400).json({ error: 'operationKey UUID es obligatorio para evitar ventas duplicadas.' });
     if (!Array.isArray(items) || items.length < 1 || items.length > 200) return res.status(400).json({ error: 'La venta debe incluir entre 1 y 200 productos.' });
     if (!['cash','card','transfer','wallet','credit'].includes(paymentMethod)) return res.status(400).json({ error: 'Medio de pago inválido.' });
     const disc = Number(discount);
