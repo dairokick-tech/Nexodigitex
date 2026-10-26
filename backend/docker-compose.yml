@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: nova_control
+    volumes:
+      - nova_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nova_control"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [private]
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CONTROL_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@postgres:5432/nova_control
+      PORT: 8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks: [private]
+volumes:
+  nova_pgdata:
+networks:
+  private:
+    driver: bridge
