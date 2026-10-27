@@ -1,12 +1,12 @@
 {
   "id": "./",
-  "name": "NOVA DIGITEX",
-  "short_name": "NOVA",
+  "name": "NEXO DIGITEX",
+  "short_name": "NEXO",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f4f7fa",
   "theme_color": "#0b2942",
-  "description": "Sistema empresarial y punto de venta NOVA DIGITEX.",
+  "description": "Sistema empresarial y punto de venta NEXO DIGITEX.",
   "icons": [{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
 }
