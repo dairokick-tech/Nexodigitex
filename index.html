@@ -55,4 +55,4 @@ async function signOut(){if(sb)await sb.auth.signOut();currentUser=null;updateUs
 function filterAll(v){query=v.toLowerCase();if(view==='home')drawRubrics();if(view==='pos')drawProducts(v)}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 window.addEventListener('online',()=>{if(sb&&currentUser)syncQueue()});initSupabase().then(home);
-</script><script src="./modules.js"></script><script>if('serviceWorker' in navigator && location.protocol!=='file:'){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}</script></body></html>
+</script><script src="./general-modules.js"></script><script src="./modules.js"></script><script>if('serviceWorker' in navigator && location.protocol!=='file:'){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}</script></body></html>
