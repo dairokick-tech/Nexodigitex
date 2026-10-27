@@ -504,3 +504,34 @@ begin
 end;
 $$;
 grant execute on function public.register_sale(text,uuid,text,text,text,text,jsonb,numeric,timestamptz) to authenticated;
+
+
+-- Ajustes de permisos operativos por rol (cajeros pueden abrir/cerrar su propia caja).
+drop policy if exists cash_sessions_self_insert on public.cash_sessions;
+create policy cash_sessions_self_insert on public.cash_sessions for insert to authenticated
+ with check(user_id=auth.uid() and public.is_company_member(company_id));
+drop policy if exists cash_sessions_self_update on public.cash_sessions;
+create policy cash_sessions_self_update on public.cash_sessions for update to authenticated
+ using(user_id=auth.uid() and status='open' and public.is_company_member(company_id))
+ with check(user_id=auth.uid() and public.is_company_member(company_id));
+drop policy if exists quotes_member_insert on public.quotes;
+create policy quotes_member_insert on public.quotes for insert to authenticated
+ with check(created_by=auth.uid() and public.is_company_member(company_id));
+
+-- La información financiera detallada se limita a propietario, administrador y gerente.
+drop policy if exists purchases_member_read on public.purchases;
+create policy purchases_member_read on public.purchases for select to authenticated using(public.can_manage_company(company_id));
+drop policy if exists purchase_items_member_read on public.purchase_items;
+create policy purchase_items_member_read on public.purchase_items for select to authenticated using(public.can_manage_company(company_id));
+drop policy if exists expenses_member_read on public.expenses;
+create policy expenses_member_read on public.expenses for select to authenticated using(public.can_manage_company(company_id));
+drop policy if exists receivables_member_read on public.receivables;
+create policy receivables_member_read on public.receivables for select to authenticated using(public.can_manage_company(company_id));
+drop policy if exists cash_sessions_member_read on public.cash_sessions;
+create policy cash_sessions_member_read on public.cash_sessions for select to authenticated
+ using(user_id=auth.uid() or public.can_manage_company(company_id));
+drop policy if exists cash_movements_member_read on public.cash_movements;
+create policy cash_movements_member_read on public.cash_movements for select to authenticated
+ using(public.can_manage_company(company_id) or exists(
+   select 1 from public.cash_sessions s where s.id=cash_session_id and s.user_id=auth.uid()
+ ));
