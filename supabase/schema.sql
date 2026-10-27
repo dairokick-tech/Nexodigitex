@@ -94,6 +94,7 @@ create table if not exists public.products(
  unique(company_id,sku)
 );
 create unique index if not exists products_company_barcode_uidx on public.products(company_id,barcode) where barcode is not null and barcode<>'';
+alter table public.products add column if not exists initial_stock numeric(14,3) not null default 0 check(initial_stock>=0);
 create table if not exists public.inventory_movements(
  id uuid primary key default gen_random_uuid(),
  company_id uuid not null references public.companies(id) on delete cascade,
@@ -307,9 +308,9 @@ begin
  end if;
  insert into public.audit_logs(company_id,actor_id,action,table_name,record_id,old_data,new_data)
  values(v_company,auth.uid(),tg_op,tg_table_name,v_id,v_old,v_new);
- return coalesce(new,old);
+ if tg_op='DELETE' then return old; else return new; end if;
 end;
-$$;
+$;
 drop trigger if exists products_audit_change on public.products;
 create trigger products_audit_change after insert or update or delete on public.products
 for each row execute function public.audit_company_change();
@@ -421,3 +422,85 @@ grant usage,select on sequence public.audit_logs_id_seq to authenticated;
 -- Importante: este esquema proporciona aislamiento por empresa dentro de una instancia PostgreSQL.
 -- La creación de bases físicas independientes requiere una API privada/servicio backend con credenciales
 -- de servidor y no se debe implementar desde el navegador.
+
+
+-- Registro transaccional de ventas para evitar duplicados y descontar stock una sola vez.
+-- El POS debe invocar esta función RPC para las ventas de una empresa; nunca usar service_role en el navegador.
+create or replace function public.register_sale(
+ p_id text,
+ p_company_id uuid,
+ p_rubric_id text,
+ p_rubric_name text,
+ p_customer_name text,
+ p_payment_method text,
+ p_items jsonb,
+ p_total numeric,
+ p_created_at timestamptz default now()
+) returns text
+language plpgsql security definer set search_path=public
+as $$
+declare
+ v_existing_company uuid;
+ v_existing_total numeric(14,2);
+ v_calc_total numeric(14,2);
+ v_line jsonb;
+ v_product public.products%rowtype;
+ v_qty numeric(14,3);
+ v_price numeric(14,4);
+ v_stock numeric(14,3);
+ v_line_no integer:=0;
+begin
+ if auth.uid() is null then raise exception 'Debes iniciar sesión.'; end if;
+ if p_id is null or length(trim(p_id))=0 then raise exception 'Identificador de venta inválido.'; end if;
+ if not public.is_company_member(p_company_id) then raise exception 'No tienes acceso a esta empresa.'; end if;
+ if p_items is null or jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'La venta debe contener productos.'; end if;
+ if p_total is null or p_total<0 then raise exception 'Total inválido.'; end if;
+
+ select company_id,total into v_existing_company,v_existing_total from public.sales where id=p_id;
+ if found then
+   if v_existing_company=p_company_id and v_existing_total=round(p_total,2) then return p_id; end if;
+   raise exception 'El identificador de operación ya existe con datos diferentes.';
+ end if;
+
+ select coalesce(sum((x->>'price')::numeric * (x->>'qty')::numeric),0)
+ into v_calc_total from jsonb_array_elements(p_items) as x;
+ if abs(v_calc_total-p_total)>0.02 then raise exception 'El total no coincide con los detalles de la venta.'; end if;
+
+ -- Validar y comprobar existencias de todos los artículos antes de escribir nada.
+ for v_line in select value from jsonb_array_elements(p_items) loop
+   v_line_no:=v_line_no+1;
+   v_qty:=coalesce((v_line->>'qty')::numeric,0);
+   v_price:=coalesce((v_line->>'price')::numeric,0);
+   if v_qty<=0 or v_price<0 then raise exception 'Cantidad o precio inválido en la línea %.',v_line_no; end if;
+   if v_line ? 'product_id' and nullif(v_line->>'product_id','') is not null then
+     select * into v_product from public.products
+       where id=(v_line->>'product_id')::uuid and company_id=p_company_id and active=true
+       for update;
+     if not found then raise exception 'Producto no válido o no pertenece a esta empresa.'; end if;
+     if abs(v_product.price-v_price)>0.0001 then raise exception 'El precio del producto % cambió. Actualiza el catálogo antes de vender.',v_product.name; end if;
+     select v_product.initial_stock+coalesce(sum(quantity),0) into v_stock
+       from public.inventory_movements where company_id=p_company_id and product_id=v_product.id;
+     if v_stock<v_qty then raise exception 'Stock insuficiente para % (disponible: %).',v_product.name,v_stock; end if;
+   end if;
+ end loop;
+
+ insert into public.sales(id,user_id,company_id,rubric_id,rubric_name,customer_name,payment_method,items,total,created_at)
+ values(p_id,auth.uid(),p_company_id,p_rubric_id,p_rubric_name,coalesce(nullif(p_customer_name,''),'Público general'),
+        p_payment_method,p_items,round(p_total,2),coalesce(p_created_at,now()));
+
+ v_line_no:=0;
+ for v_line in select value from jsonb_array_elements(p_items) loop
+   v_line_no:=v_line_no+1;
+   if v_line ? 'product_id' and nullif(v_line->>'product_id','') is not null then
+     select * into v_product from public.products where id=(v_line->>'product_id')::uuid and company_id=p_company_id;
+     insert into public.inventory_movements(company_id,product_id,movement_type,quantity,unit_cost,reference_type,reference_id,idempotency_key,created_by,notes)
+     values(p_company_id,v_product.id,'sale',-((v_line->>'qty')::numeric),v_product.cost,'sale',p_id,p_id||':'||v_product.id::text||':'||v_line_no,auth.uid(),'Descuento automático por venta confirmada')
+     on conflict(company_id,idempotency_key) do nothing;
+   end if;
+ end loop;
+ insert into public.audit_logs(company_id,actor_id,action,table_name,record_id,new_data)
+ values(p_company_id,auth.uid(),'SALE_REGISTERED','sales',p_id,jsonb_build_object('total',round(p_total,2),'payment_method',p_payment_method));
+ return p_id;
+end;
+$$;
+grant execute on function public.register_sale(text,uuid,text,text,text,text,jsonb,numeric,timestamptz) to authenticated;
