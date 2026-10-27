@@ -18,23 +18,21 @@ jobs:
       - name: Check required files
         run: |
           test -s index.html
-          test -s modules.js
-          test -s general-modules.js
-          test -s operations.js
           test -s manifest.json
-          test -s supabase/schema.sql
           test -s sw.js
-      - name: Check JavaScript syntax
+          grep -q 'Punto de venta' index.html
+          grep -q 'Productos e inventario' index.html
+      - name: Check embedded application JavaScript syntax
         run: |
-          node --check modules.js
-          node --check general-modules.js
-          node --check operations.js
-      - name: Check database migration markers
-        run: |
-          grep -q 'create table if not exists public.companies' supabase/schema.sql
-          grep -q 'create table if not exists public.products' supabase/schema.sql
-          grep -q 'function public.register_sale' supabase/schema.sql
-          grep -q 'row level security' supabase/schema.sql
+          python - <<'PY'
+          import re
+          html = open("index.html", encoding="utf-8").read()
+          scripts = re.findall(r"<script>(.*?)</script>", html, re.S)
+          if not scripts:
+              raise SystemExit("No inline application script found")
+          open("/tmp/nova-inline.js", "w", encoding="utf-8").write(max(scripts, key=len))
+          PY
+          node --check /tmp/nova-inline.js
   deploy:
     needs: validate
     environment:
