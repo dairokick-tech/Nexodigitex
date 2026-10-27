@@ -354,13 +354,13 @@ create policy sales_company_access on public.sales for all to authenticated
 drop policy if exists "Users manage their own customers" on public.customers;
 drop policy if exists customers_company_access on public.customers;
 create policy customers_company_access on public.customers for all to authenticated
- using(user_id=auth.uid() or (company_id is not null and public.is_company_member(company_id)))
- with check(user_id=auth.uid() or (company_id is not null and public.is_company_member(company_id)));
+ using((user_id=auth.uid() and (company_id is null or public.is_company_member(company_id))) or (company_id is not null and public.is_company_member(company_id)))
+ with check((user_id=auth.uid() and (company_id is null or public.is_company_member(company_id))) or (company_id is not null and public.is_company_member(company_id)));
 drop policy if exists "Users manage their own business records" on public.business_records;
 drop policy if exists business_records_company_access on public.business_records;
 create policy business_records_company_access on public.business_records for all to authenticated
- using(user_id=auth.uid() or (company_id is not null and public.is_company_member(company_id)))
- with check(user_id=auth.uid() or (company_id is not null and public.is_company_member(company_id)));
+ using((user_id=auth.uid() and (company_id is null or public.is_company_member(company_id))) or (company_id is not null and public.is_company_member(company_id)))
+ with check((user_id=auth.uid() and (company_id is null or public.is_company_member(company_id))) or (company_id is not null and public.is_company_member(company_id)));
 
 drop policy if exists companies_member_read on public.companies;
 create policy companies_member_read on public.companies for select to authenticated using(public.is_company_member(id));
