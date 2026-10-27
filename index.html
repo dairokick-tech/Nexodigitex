@@ -44,6 +44,52 @@
     <div class="login-foot">Acceso al sistema</div>
   </section>
 </div>
+<script>
+/* Login de respaldo independiente: evita que un error del script principal recargue el formulario. */
+(function(){
+ const form=document.getElementById('loginForm');
+ if(!form)return;
+ form.addEventListener('submit',async function(ev){
+   ev.preventDefault();
+   ev.stopImmediatePropagation();
+   const user=document.getElementById('loginUser');
+   const pass=document.getElementById('loginPassword');
+   const error=document.getElementById('loginError');
+   const screen=document.getElementById('loginScreen');
+   const app=document.getElementById('appShell');
+   const button=form.querySelector('[type="submit"]');
+   const u=(user.value||'').trim(),p=pass.value||'';
+   error.textContent='';
+   if(!u||!p){error.textContent='Escribe tu usuario y contraseña.';return;}
+   button.disabled=true;
+   try{
+     const key='nova_digitex_auth_v1';
+     let account=null;try{account=JSON.parse(localStorage.getItem(key)||'null')}catch(_){}
+     const hash=async(password,salt)=>{
+       const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);
+       const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:180000,hash:'SHA-256'},k,256);
+       return Array.from(new Uint8Array(bits)).map(v=>v.toString(16).padStart(2,'0')).join('');
+     };
+     if(account){
+       if(u.toLowerCase()!==String(account.username||'').toLowerCase()){error.textContent='El usuario no coincide con el acceso local creado en este dispositivo.';return;}
+       if(await hash(p,account.salt)!==account.hash){error.textContent='La contraseña no coincide. No se borraron tus datos.';return;}
+     }else{
+       if(u.length<3){error.textContent='El usuario debe tener al menos 3 caracteres.';return;}
+       if(p.length<10){error.textContent='Para crear el primer acceso, usa una contraseña de al menos 10 caracteres.';return;}
+       if(!window.crypto||!crypto.subtle){error.textContent='El navegador no permite crear el acceso seguro. Abre el sitio mediante HTTPS.';return;}
+       const salt=Array.from(crypto.getRandomValues(new Uint8Array(16))).map(v=>v.toString(16).padStart(2,'0')).join('');
+       account={username:u,salt,hash:await hash(p,salt),createdAt:new Date().toISOString(),mode:'local'};
+       localStorage.setItem(key,JSON.stringify(account));
+     }
+     sessionStorage.setItem('nova_digitex_session_v1',account.username);
+     screen.style.display='none';app.style.display='flex';
+     const signed=document.getElementById('signedUser');if(signed)signed.textContent='　'+account.username;
+     const note=document.createElement('div');note.setAttribute('role','status');note.style.cssText='position:fixed;bottom:12px;left:12px;right:12px;z-index:99999;background:#fff4d6;color:#5c4300;border:1px solid #e2bf62;padding:12px;border-radius:8px;font:14px system-ui';note.textContent='Acceso local activado. La sincronización con la nube no está confirmada; conserva una copia de seguridad de tus datos.';document.body.appendChild(note);setTimeout(()=>note.remove(),9000);
+   }catch(e){error.textContent='No se pudo abrir el acceso: '+(e&&e.message?e.message:'error inesperado');}
+   finally{button.disabled=false;}
+ },true);
+})();
+</script>
 <div class="shell" id="appShell"><aside class="side" id="side"><div class="brand"><img src="./logo.svg" alt="NEXO DIGITEX" style="display:block;width:100%;max-width:210px;height:auto;margin:0 auto 8px"><small>GESTIÓN EMPRESARIAL</small></div><div class="company"><label>EMPRESA ACTIVA</label><select id="co"></select><button id="newCo">＋ Agregar empresa</button></div><nav class="nav" id="nav"><button class="active" data-page="dashboard">▦　Resumen</button><button data-page="pos">▣　Punto de venta</button><button data-page="products">▤　Productos e inventario</button><button data-page="customers">♙　Clientes</button><button data-page="suppliers">♧　Proveedores</button><button data-page="cash">▣　Caja</button><button data-page="purchases">⇩　Compras</button><button data-page="quotes">▧　Cotizaciones</button><button data-page="receivables">◷　Cuentas por cobrar</button><button data-page="expenses">↘　Gastos</button><button data-page="returns">↩　Devoluciones y cambios</button><button data-page="tickets">▤　Tickets de venta</button><button data-page="giftcards">▣　Tarjetas de regalo</button><button data-page="refunds">↶　Devoluciones de dinero</button><button data-page="guides">⇥　Guías de remisión</button><button data-page="prices">＄　Listas de precios</button><button data-page="promotions">％　Promociones y descuentos</button><button data-page="users">♙　Usuarios y equipo</button><button data-page="audit">☷　Auditoría</button><button data-page="reports">▥　Reportes</button><button data-page="settings">⚙　Configuración</button></nav><div class="foot">● Funcionamiento local<br><br>Versión inicial 0.1.0</div></aside><main class="main"><header class="top"><div><button class="btn mobile" id="toggle">☰</button>　<strong id="ptitle">Resumen</strong></div><div style="display:flex;align-items:center;gap:10px"><span class="pill" id="network">● Local</span><span class="user" id="signedUser">　Administrador</span><button class="btn" id="logoutBtn" type="button">Cerrar sesión</button></div></header><section class="content" id="view"></section><footer class="footer">NEXO DIGITEX · Base inicial independiente</footer></main></div><div id="toast" class="toast"></div><dialog id="modal"><form id="form" method="dialog"><div class="modalhead"><h2 id="mtitle">Registro</h2><button class="btn" value="cancel">×</button></div><div class="modalbody" id="mbody"></div><div class="modalfoot"><button class="btn" value="cancel">Cancelar</button><button class="btn primary" id="save" value="default">Guardar</button></div></form></dialog>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
