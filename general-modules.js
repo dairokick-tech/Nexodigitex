@@ -62,7 +62,7 @@
   }
 
   window.generalModulesPage = function () {
-    window.view = "general";
+    view = "general";
     if (typeof nav === "function") nav("general");
     if (typeof setAccent === "function") setAccent(null);
     renderGeneralModules("");
