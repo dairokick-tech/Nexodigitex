@@ -79,11 +79,11 @@
   window.productsPage = async function() {
     const co=await activeCompany(); if(!co)return; view='products';nav('products');setAccent(null);
     $('view').innerHTML=top('Catálogo general','Productos e inventario','Empresa activa: '+co.name+'. Registra artículos y consulta sus movimientos.')+
-      '<div class="panel"><h3>Nuevo producto</h3><form id="productForm"><div class="field"><label>Nombre del producto</label><input id="prName" required></div><div class="field"><label>Código interno / SKU</label><input id="prSku"></div><div class="field"><label>Código de barras</label><input id="prBar"></div><div class="field"><label>Categoría</label><input id="prCat" value="General"></div><div class="field"><label>Unidad de medida</label><input id="prUnit" value="unidad"></div><div class="field"><label>Costo (S/)</label><input id="prCost" type="number" min="0" step=".0001" value="0" required></div><div class="field"><label>Precio de venta (S/)</label><input id="prPrice" type="number" min="0" step=".0001" value="0" required></div><div class="field"><label>Stock mínimo</label><input id="prMin" type="number" min="0" step=".001" value="0" required></div><button class="primary">Guardar producto</button></form><p id="prMessage" class="sub" style="margin:12px 0 0"></p></div><div id="productsRows"></div>';
-    $('productForm').onsubmit=async e=>{e.preventDefault();const row={company_id:co.id,name:$('prName').value.trim(),sku:$('prSku').value.trim()||null,barcode:$('prBar').value.trim()||null,category:$('prCat').value.trim()||'General',unit:$('prUnit').value.trim()||'unidad',cost:Number($('prCost').value),price:Number($('prPrice').value),min_stock:Number($('prMin').value),created_by:currentUser.id};
-      const {error}=await sb.from('products').insert(row);if(error){$('prMessage').textContent='No se pudo guardar: '+error.message;return}e.target.reset();$('prCat').value='General';$('prUnit').value='unidad';$('prCost').value='0';$('prPrice').value='0';$('prMin').value='0';await window.productsPage();};
+      '<div class="panel"><h3>Nuevo producto</h3><form id="productForm"><div class="field"><label>Nombre del producto</label><input id="prName" required></div><div class="field"><label>Código interno / SKU</label><input id="prSku"></div><div class="field"><label>Código de barras</label><input id="prBar"></div><div class="field"><label>Categoría</label><input id="prCat" value="General"></div><div class="field"><label>Unidad de medida</label><input id="prUnit" value="unidad"></div><div class="field"><label>Costo (S/)</label><input id="prCost" type="number" min="0" step=".0001" value="0" required></div><div class="field"><label>Precio de venta (S/)</label><input id="prPrice" type="number" min="0" step=".0001" value="0" required></div><div class="field"><label>Stock inicial</label><input id="prInitial" type="number" min="0" step=".001" value="0" required></div><div class="field"><label>Stock mínimo</label><input id="prMin" type="number" min="0" step=".001" value="0" required></div><button class="primary">Guardar producto</button></form><p id="prMessage" class="sub" style="margin:12px 0 0"></p></div><div id="productsRows"></div>';
+    $('productForm').onsubmit=async e=>{e.preventDefault();const row={company_id:co.id,name:$('prName').value.trim(),sku:$('prSku').value.trim()||null,barcode:$('prBar').value.trim()||null,category:$('prCat').value.trim()||'General',unit:$('prUnit').value.trim()||'unidad',cost:Number($('prCost').value),price:Number($('prPrice').value),initial_stock:Number($('prInitial').value),min_stock:Number($('prMin').value),created_by:currentUser.id};
+      const {error}=await sb.from('products').insert(row);if(error){$('prMessage').textContent='No se pudo guardar: '+error.message;return}e.target.reset();$('prCat').value='General';$('prUnit').value='unidad';$('prCost').value='0';$('prPrice').value='0';$('prInitial').value='0';$('prMin').value='0';await window.productsPage();};
     const {data,error}=await sb.from('products').select('*').eq('company_id',co.id).order('created_at',{ascending:false}).limit(500);
-    $('productsRows').innerHTML=error?notice(esc(error.message)):table(['Producto','SKU / barras','Categoría','Costo','Precio','Margen bruto','Stock mínimo'],(data||[]).map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.sku||'—')+' / '+esc(p.barcode||'—')+'</td><td>'+esc(p.category)+'</td><td>'+cash(p.cost)+'</td><td>'+cash(p.price)+'</td><td>'+cash(Number(p.price)-Number(p.cost))+'</td><td>'+esc(p.min_stock)+'</td></tr>'),'No hay productos registrados.');
+    $('productsRows').innerHTML=error?notice(esc(error.message)):table(['Producto','SKU / barras','Categoría','Costo','Precio','Margen bruto','Stock mínimo'],(data||[]).map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.sku||'—')+' / '+esc(p.barcode||'—')+'</td><td>'+esc(p.category)+'</td><td>'+cash(p.cost)+'</td><td>'+cash(p.price)+'</td><td>'+cash(Number(p.price)-Number(p.cost))+'</td><td>'+esc(p.initial_stock||0)+'</td><td>'+esc(p.min_stock)+'</td></tr>'),'No hay productos registrados.');
   };
   window.suppliersPage = async function() {
     const co=await activeCompany();if(!co)return;view='suppliers';nav('suppliers');setAccent(null);
@@ -168,6 +168,51 @@
     for(const [id,label,fn] of items){if(navRoot.querySelector('[data-v="'+id+'"]'))continue;const b=document.createElement('button');b.dataset.v=id;b.textContent=label;b.addEventListener('click',()=>window[fn]());navRoot.appendChild(b);}
   });
 
+  // Abrir el POS con el catálogo real de la empresa seleccionada cuando exista.
+  window.openPOS = async function(id) {
+    const base=R.find(r=>r.id===id); if(!base)return;
+    active=base; cart=[]; window.novaPosProducts=new Map();
+    if(sb&&currentUser&&companyId()){
+      const {data,error}=await sb.from('products').select('id,name,category,price,cost,initial_stock,min_stock').eq('company_id',companyId()).eq('active',true).order('name').limit(1000);
+      if(!error&&data&&data.length){
+        window.novaPosProducts=new Map(data.map(p=>[p.name,p]));
+        active={...base,p:data.map(p=>[p.name,p.category,Number(p.price)])};
+      }
+    }
+    view='pos';setAccent(active);nav('');renderPOS();
+  };
+  const originalAddCart=window.addCart;
+  window.addCart=function(i){
+    const search=$('psearch')?.value||'';
+    const visible=active.p.filter(p=>(p[0]+' '+p[1]).toLowerCase().includes(search.toLowerCase()));
+    const p=visible[i]; if(!p){if(originalAddCart)originalAddCart(i);return;}
+    const real=window.novaPosProducts?.get(p[0]);
+    const found=cart.find(x=>x.name===p[0]&&x.product_id===(real?.id||null));
+    if(found)found.qty++;else cart.push({name:p[0],category:p[1],price:Number(p[2]),qty:1,...(real?{product_id:real.id}: {})});
+    drawCart();
+  };
+  window.inventoryPage = async function() {
+    const co=await activeCompany();if(!co)return;view='inventory';nav('inventory');setAccent(null);
+    $('view').innerHTML=top('Control de existencias','Inventario y kardex','Empresa activa: '+co.name+'. El stock se calcula a partir del stock inicial y los movimientos registrados.')+
+      '<div class="panel"><h3>Registrar movimiento manual</h3><form id="movementForm"><div class="field"><label>Producto</label><select id="mvProduct" required></select></div><div class="field"><label>Tipo de movimiento</label><select id="mvType"><option value="purchase">Entrada / compra</option><option value="adjustment">Ajuste positivo</option><option value="damage">Merma o daño</option><option value="return_in">Devolución recibida</option></select></div><div class="field"><label>Cantidad</label><input id="mvQty" type="number" min="0.001" step=".001" required></div><div class="field"><label>Nota / referencia</label><input id="mvNote"></div><button class="primary">Registrar movimiento</button></form><p class="sub" style="margin:10px 0 0">Las salidas por venta se registran transaccionalmente mediante la función de base de datos.</p></div><div id="inventoryRows"></div>';
+    const {data:products,error:pe}=await sb.from('products').select('*').eq('company_id',co.id).eq('active',true).order('name');
+    if(pe){$('inventoryRows').innerHTML=notice(esc(pe.message));return;}
+    $('mvProduct').innerHTML=(products||[]).map(p=>'<option value="'+p.id+'">'+esc(p.name)+' · '+esc(p.sku||p.barcode||'sin código')+'</option>').join('');
+    $('movementForm').onsubmit=async e=>{e.preventDefault();const quantity=Number($('mvQty').value);if(!quantity||quantity<=0)return alert('Cantidad inválida');const type=$('mvType').value;const {error}=await sb.from('inventory_movements').insert({company_id:co.id,product_id:$('mvProduct').value,movement_type:type,quantity:type==='damage'?-quantity:quantity,unit_cost:Number((products||[]).find(p=>p.id===$('mvProduct').value)?.cost||0),idempotency_key:uid(),created_by:currentUser.id,notes:$('mvNote').value.trim()||null});if(error){alert('No se registró el movimiento: '+error.message);return}await window.inventoryPage();};
+    const {data:movements,error:me}=await sb.from('inventory_movements').select('product_id,quantity').eq('company_id',co.id);
+    if(me){$('inventoryRows').innerHTML=notice(esc(me.message));return;}
+    const stock=new Map((products||[]).map(p=>[p.id,Number(p.initial_stock||0)]));(movements||[]).forEach(m=>stock.set(m.product_id,(stock.get(m.product_id)||0)+Number(m.quantity||0)));
+    $('inventoryRows').innerHTML=table(['Producto','SKU','Categoría','Stock actual','Stock mínimo','Precio','Estado'],(products||[]).map(p=>{const n=stock.get(p.id)||0;return '<tr><td>'+esc(p.name)+'</td><td>'+esc(p.sku||p.barcode||'—')+'</td><td>'+esc(p.category)+'</td><td><b>'+n.toFixed(3)+'</b></td><td>'+esc(p.min_stock)+'</td><td>'+cash(p.price)+'</td><td>'+(n<=Number(p.min_stock)?'<span class="pill" style="background:#fee2e2;color:#991b1b">Stock bajo</span>':'Disponible')+'</td></tr>';}),'No hay productos. Registra productos en Productos reales.');
+  };
+  window.customersPage = async function() {
+    const co=await activeCompany();if(!co)return;view='customers';nav('customers');setAccent(null);
+    $('view').innerHTML=top('Relación comercial','Clientes','Empresa activa: '+co.name)+
+      '<div class="panel"><h3>Nuevo cliente</h3><form id="customerForm"><div class="field"><label>Nombre o razón social</label><input id="cn" required></div><div class="field"><label>DNI/RUC</label><input id="cd"></div><div class="field"><label>Teléfono</label><input id="ct"></div><div class="field"><label>Correo</label><input id="ce" type="email"></div><button class="primary">Guardar cliente</button></form></div><div id="customerRows"></div>';
+    $('customerForm').onsubmit=async e=>{e.preventDefault();const {error}=await sb.from('customers').insert({id:uid(),user_id:currentUser.id,company_id:co.id,name:$('cn').value.trim(),document_number:$('cd').value.trim()||null,phone:$('ct').value.trim()||null,email:$('ce').value.trim()||null});if(error){alert(error.message);return}await window.customersPage();};
+    const {data,error}=await sb.from('customers').select('*').eq('company_id',co.id).order('created_at',{ascending:false}).limit(500);
+    $('customerRows').innerHTML=error?notice(esc(error.message)):table(['Cliente','Documento','Teléfono','Fecha de registro'],(data||[]).map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+esc(c.document_number||'—')+'</td><td>'+esc(c.phone||'—')+'</td><td>'+new Date(c.created_at).toLocaleDateString('es-PE')+'</td></tr>'));
+  };
+
   // Cada venta nueva se vincula a la empresa activa; el ID idempotente se conserva en reintentos.
   window.completeSale = async function() {
     if(!cart.length){alert('Agrega al menos un producto.');return;}
@@ -183,13 +228,15 @@
     if(!sb||!currentUser)return;
     const q=read('nova_queue'),left=[];
     for(const s of q){
-      const payload={id:s.id,user_id:currentUser.id,company_id:s.company_id||companyId(),rubric_id:s.rubric_id,rubric_name:s.rubric_name,customer_name:s.customer_name,payment_method:s.payment_method,items:s.items,total:s.total,created_at:s.created_at};
-      const {error}=await sb.from('sales').upsert(payload,{onConflict:'id'});
+      let error=null;
+      if(s.company_id||companyId()) { const {error:rpcError}=await sb.rpc('register_sale',{p_id:s.id,p_company_id:s.company_id||companyId(),p_rubric_id:s.rubric_id,p_rubric_name:s.rubric_name,p_customer_name:s.customer_name,p_payment_method:s.payment_method,p_items:s.items,p_total:s.total,p_created_at:s.created_at}); error=rpcError; }
+      else { const payload={id:s.id,user_id:currentUser.id,rubric_id:s.rubric_id,rubric_name:s.rubric_name,customer_name:s.customer_name,payment_method:s.payment_method,items:s.items,total:s.total,created_at:s.created_at}; const result=await sb.from('sales').upsert(payload,{onConflict:'id'}); error=result.error; }
       if(error)left.push(s);
       else {const all=getSales().map(x=>x.id===s.id?{...x,status:'synced'}:x);write('nova_sales',all);}
     }
     write('nova_queue',left);setStatus(left.length?'● Pendiente de sincronizar':'● Supabase sincronizado',left.length?'err':'ok');
   };
   // La versión original sigue disponible para el historial; reintentar la cola al volver la red.
+  window.syncQueue = () => window.syncNovaQueue();
   window.addEventListener('online',()=>{if(sb&&currentUser)window.syncNovaQueue();});
 })();
