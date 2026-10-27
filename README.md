@@ -1,55 +1,53 @@
-# NOVA DIGITEX — ERP + POS multirrubro
+# NOVA DIGITEX — POS y gestión empresarial multirrubro
 
-Aplicación web adaptable a escritorio Windows y móviles Android, con un punto de venta independiente por rubro y colores diferenciados.
+Aplicación web adaptable a Windows y Android, con puntos de venta diferenciados por rubro, módulos generales, catálogo de empresas y sucursales, productos, inventario, clientes, proveedores, caja, cotizaciones, gastos, reportes y configuración de automatizaciones.
 
-## 11 rubros y operaciones especializadas
+## Funciones incluidas en el repositorio
 
-| Rubro | Color | Herramientas específicas |
-|---|---|---|
-| Farmacias y boticas | Azul | Lotes, vencimientos, receta/control especial y compras a laboratorio |
-| Restaurantes y cafeterías | Naranja | Mesas, comandas, reservas y delivery |
-| Bodegas y minimarkets | Verde | Código de barras, ventas por peso/unidad y fiado/cobranza |
-| Tiendas y comercios | Morado | Cotizaciones, pedidos, apartados, garantías y descuentos |
-| Tiendas de ropa y calzado | Fucsia | Tallas, colores, variantes, cambios y promociones |
-| Ferreterías | Turquesa | Conversión de unidades, cotizaciones de obra y compras |
-| Mayoristas y distribuidores | Azul oscuro | Precios por volumen, crédito, despacho y rutas |
-| Hoteles y hospedajes | Dorado | Reservas, check-in/check-out y cargos de huésped |
-| Servicios y oficinas | Aqua | Órdenes de servicio, contratos y cobros recurrentes |
-| Almacenes y logística | Azul | Recepción/despacho, picking/packing y transferencias |
-| Librerías y útiles | Violeta | ISBN, kits escolares y cotizaciones para colegios |
+- 11 espacios POS de demostración diferenciados por rubro.
+- Catálogo de 25 módulos generales y buscador de funciones.
+- Creación de empresas en Supabase y asignación automática del creador como propietario.
+- Membresías por empresa, roles y políticas de acceso RLS.
+- Gestión de sucursales.
+- Catálogo de productos por empresa con SKU, código de barras, costo, precio, stock inicial y mínimo.
+- Inventario calculado desde el stock inicial y movimientos de kardex.
+- Clientes y proveedores por empresa.
+- Registro de gastos, cotizaciones y sesiones de caja.
+- Reporte resumido de ventas, gastos, compras y productos.
+- Preferencias de automatización por empresa.
+- Cola de ventas locales con identificadores únicos y reintentos.
+- RPC `register_sale` para registrar ventas de empresa en una transacción, validar stock y descontar existencias sin duplicar movimientos.
+- PWA con archivos de aplicación cacheados para abrir la interfaz sin conexión.
+- Exportación CSV del historial de ventas.
 
-## Funciones comunes del POS
+## Publicar la aplicación
 
-- Catálogo demostrativo, carrito, cantidades y medios de pago.
-- Guardado de ventas en el dispositivo, historial y exportación CSV.
-- Apertura/cierre de caja demostrativos.
-- Formularios operativos específicos por rubro.
-- Registros adicionales guardados localmente con cola para sincronización.
-- PWA básica para instalar en navegador compatible y caché de archivos principales.
+La publicación se ejecuta mediante GitHub Actions en cada cambio a `main`. Revisa **Actions → Validate and deploy NOVA DIGITEX** para comprobar la validación y el despliegue. Si GitHub Pages no publica, entra a Settings → Pages y selecciona **GitHub Actions** como origen.
 
-## Activar Supabase
+## Configurar Supabase
 
-1. Crea un proyecto en Supabase.
-2. Abre **SQL Editor** y ejecuta el archivo `supabase/schema.sql`.
-3. En la aplicación entra a **Supabase y configuración**.
-4. Ingresa Project URL y clave pública/publishable (o anon public key).
-5. Crea una cuenta e inicia sesión.
-6. Verifica que la cola de ventas y operaciones se sincronice; prueba con dos dispositivos antes de usar datos reales.
+1. Abre el proyecto Supabase de NOVA DIGITEX.
+2. Entra a **SQL Editor**.
+3. Ejecuta el archivo completo `supabase/schema.sql` (esquema v3).
+4. En la aplicación abre **Supabase y configuración**.
+5. Introduce la URL del proyecto y la clave pública/publishable o anon pública.
+6. Crea una cuenta e inicia sesión.
+7. Abre **Empresas y sucursales**, crea una empresa y selecciónala.
+8. Registra productos en **Productos reales** e inventario inicial; luego prueba ventas, clientes, proveedores, caja, gastos y cotizaciones.
+9. Prueba con dos usuarios y dos dispositivos, incluida la pérdida de internet y la recuperación de la cola.
 
-El esquema contiene tablas `sales`, `customers` y `business_records` con RLS que restringe registros al usuario autenticado.
+**Nunca pegues una clave `service_role` en la aplicación, en el navegador ni en GitHub.** La clave pública solo es segura junto con políticas RLS correctas.
 
-## GitHub Pages
+## Aislamiento multiempresa
 
-La publicación automática está definida en `.github/workflows/deploy.yml`. Si el workflow falla en **Setup Pages**, abre Settings → Pages del repositorio y selecciona **GitHub Actions** como Build and deployment source. Después vuelve a ejecutar el workflow desde Actions.
+El esquema implementa una instancia PostgreSQL/Supabase con datos aislados por empresa mediante `company_id`, membresías y RLS. Crear una base de datos PostgreSQL física independiente para cada empresa requiere un backend privado de aprovisionamiento con credenciales de servidor; no se ejecuta desde la web estática y no se debe resolver exponiendo secretos.
 
-## Seguridad y estado real
+## Limitaciones que aún requieren integración externa o pruebas
 
-- Nunca insertar la clave `service_role` en el frontend ni en archivos de GitHub.
-- El esquema usa RLS, pero cada empresa/tenant, sucursal y rol todavía requiere modelado antes de operación multiempresa.
-- No introducir datos reales sensibles en esta versión prototipo.
-- Los productos, precios y stocks que aparecen en pantalla son demostrativos.
-- Las operaciones especiales se guardan en el navegador y se envían a `business_records` cuando hay sesión y conexión; debe validarse la sincronización multi-dispositivo y la recuperación de fallos.
-- No está listo para facturación electrónica SUNAT. Faltan integración homologada, certificados, series, envío/consulta de comprobantes y pruebas.
-- También faltan inventario transaccional con kardex, permisos por rol, auditoría completa, impresoras, compras completas, cuentas por cobrar/pagar y pruebas de seguridad.
-
-**No usar todavía como sistema contable/fiscal o caja comercial de producción.**
+- La aplicación no debe usarse todavía como sistema fiscal/comercial de producción sin ejecutar y verificar el SQL en el proyecto real, probar permisos y validar recuperación de respaldos.
+- La integración oficial de comprobantes SUNAT no está implementada ni homologada. Requiere proveedor/servicio backend, credenciales y certificados válidos, series, envío, consulta de CDR y pruebas.
+- No se incluyen pagos reales ni conciliación bancaria automática con entidades financieras.
+- Las reglas de automatización guardan preferencias; las tareas de fondo requieren un servicio programado en servidor.
+- La PWA permite abrir la interfaz sin conexión, pero la sincronización con la nube ocurre al recuperar internet. Debe probarse con datos reales de ensayo antes de operación comercial.
+- Los productos de demostración de los POS por rubro siguen siendo datos de muestra; para ventas con control de stock se debe registrar y seleccionar el catálogo real de la empresa.
+- Este repositorio web no es un instalador nativo Windows ni un APK firmado. La PWA puede instalarse desde un navegador compatible; los instaladores nativos requieren empaquetado y pruebas adicionales.
