@@ -535,3 +535,23 @@ create policy cash_movements_member_read on public.cash_movements for select to 
  using(public.can_manage_company(company_id) or exists(
    select 1 from public.cash_sessions s where s.id=cash_session_id and s.user_id=auth.uid()
  ));
+
+
+-- NEXO DIGITEX: copia sincronizada del estado de la aplicación.
+-- RLS restringe cada fila al usuario autenticado. No usar service_role en el navegador.
+create table if not exists public.nexodigitex_state (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  payload jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.nexodigitex_state enable row level security;
+drop policy if exists "NEXO users read own state" on public.nexodigitex_state;
+create policy "NEXO users read own state" on public.nexodigitex_state
+  for select to authenticated using (auth.uid() = user_id);
+drop policy if exists "NEXO users insert own state" on public.nexodigitex_state;
+create policy "NEXO users insert own state" on public.nexodigitex_state
+  for insert to authenticated with check (auth.uid() = user_id);
+drop policy if exists "NEXO users update own state" on public.nexodigitex_state;
+create policy "NEXO users update own state" on public.nexodigitex_state
+  for update to authenticated using (auth.uid() = user_id) with check (auth.uid() = user_id);
+grant select, insert, update on public.nexodigitex_state to authenticated;
