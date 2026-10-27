@@ -7,8 +7,8 @@
   const write = (k,v) => localStorage.setItem(k, JSON.stringify(v));
   const uid = () => crypto.randomUUID ? crypto.randomUUID() : 'nv-' + Date.now() + '-' + Math.random().toString(16).slice(2);
   const userKey = prefix => prefix + (currentUser?.id || 'local');
-  const companyId = () => currentUser ? localStorage.getItem('nova_active_company_' + currentUser.id) : null;
-  const setCompany = id => { if(currentUser && id) localStorage.setItem('nova_active_company_' + currentUser.id,id); };
+  const companyId = () => currentUser ? localStorage.getItem('nova_active_company_' + currentUser.id) : localStorage.getItem('nova_last_company_id');
+  const setCompany = id => { if(id){ localStorage.setItem('nova_last_company_id',id); if(currentUser) localStorage.setItem('nova_active_company_' + currentUser.id,id); } };
   const localKey = table => 'nova_' + table + '_' + (companyId() || 'local');
   const requireSession = () => {
     if (!sb || !currentUser) { alert('Conecta Supabase e entra con tu cuenta en Supabase y configuración para administrar empresas y sincronizar datos.'); if(typeof settingsPage==='function') settingsPage(); return false; }
@@ -172,12 +172,16 @@
   window.openPOS = async function(id) {
     const base=R.find(r=>r.id===id); if(!base)return;
     active=base; cart=[]; window.novaPosProducts=new Map();
-    if(sb&&currentUser&&companyId()){
-      const {data,error}=await sb.from('products').select('id,name,category,price,cost,initial_stock,min_stock').eq('company_id',companyId()).eq('active',true).order('name').limit(1000);
-      if(!error&&data&&data.length){
-        window.novaPosProducts=new Map(data.map(p=>[p.name,p]));
-        active={...base,p:data.map(p=>[p.name,p.category,Number(p.price)])};
-      }
+    const cachedId=companyId();
+    let realProducts=[];
+    if(sb&&currentUser&&cachedId){
+      const {data,error}=await sb.from('products').select('id,name,category,price,cost,initial_stock,min_stock').eq('company_id',cachedId).eq('active',true).order('name').limit(1000);
+      if(!error&&data){realProducts=data;localStorage.setItem('nova_cached_products_'+cachedId,JSON.stringify(data));}
+    }
+    if(!realProducts.length&&cachedId){try{realProducts=JSON.parse(localStorage.getItem('nova_cached_products_'+cachedId)||'[]');}catch{}}
+    if(realProducts.length){
+      window.novaPosProducts=new Map(realProducts.map(p=>[p.name,p]));
+      active={...base,p:realProducts.map(p=>[p.name,p.category,Number(p.price)])};
     }
     view='pos';setAccent(active);nav('');renderPOS();
   };
@@ -229,7 +233,7 @@
     const q=read('nova_queue'),left=[];
     for(const s of q){
       let error=null;
-      if(s.company_id||companyId()) { const {error:rpcError}=await sb.rpc('register_sale',{p_id:s.id,p_company_id:s.company_id||companyId(),p_rubric_id:s.rubric_id,p_rubric_name:s.rubric_name,p_customer_name:s.customer_name,p_payment_method:s.payment_method,p_items:s.items,p_total:s.total,p_created_at:s.created_at}); error=rpcError; }
+      if(s.company_id) { const {error:rpcError}=await sb.rpc('register_sale',{p_id:s.id,p_company_id:s.company_id,p_rubric_id:s.rubric_id,p_rubric_name:s.rubric_name,p_customer_name:s.customer_name,p_payment_method:s.payment_method,p_items:s.items,p_total:s.total,p_created_at:s.created_at}); error=rpcError; }
       else { const payload={id:s.id,user_id:currentUser.id,rubric_id:s.rubric_id,rubric_name:s.rubric_name,customer_name:s.customer_name,payment_method:s.payment_method,items:s.items,total:s.total,created_at:s.created_at}; const result=await sb.from('sales').upsert(payload,{onConflict:'id'}); error=result.error; }
       if(error)left.push(s);
       else {const all=getSales().map(x=>x.id===s.id?{...x,status:'synced'}:x);write('nova_sales',all);}
